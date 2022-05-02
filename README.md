@@ -1,8 +1,10 @@
 # AutoLyricize
 
-> Find song lyrics.
+> Automatically find and embed song lyrics.
 
 This script scans a specified directory for audio files, and for each file, finds lyrics from Lyricsify.com or Genius.com (as a fallback), and saves them to the file's metadata.
+
+Perfect for use with [Spotiflyer](https://github.com/Shabinder/SpotiFlyer/) (or [downtify-premium](https://github.com/eviabs/downtify-premium)), [Retro Music Player](https://github.com/RetroMusicPlayer/RetroMusicPlayer), and [Syncthing](https://github.com/syncthing/syncthing) to reduce your dependence on music streaming services.
 
 ## Setup
 
