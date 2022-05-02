@@ -41,8 +41,8 @@ def lyricsify_find_song_lyrics(query):
         "html.parser")
     # If the artist or song name does not exist in the query, return None
     artist_title = song_html.find("h1").string[:-7]
-    artist = artist_title[0:artist_title.index(" - ")]
-    title = artist_title[artist_title.index(" - ") + 3:]
+    artist = artist_title[0:artist_title.index("-")].strip()
+    title = artist_title[artist_title.index("-") + 1:].strip()
     query_lower = query.lower()
     if query_lower.find(title.lower()) < 0 or query_lower.find(artist.lower()) < 0:
         return None
@@ -112,10 +112,18 @@ for i, file in enumerate(files):
     query = re.sub(r" ?\([^)]+\)", "",
                    audio_file.tag.artist + " - " + audio_file.tag.title)
     site_used = "Lyricsify"
-    lyrics = lyricsify_find_song_lyrics(query)
+    try:
+        lyrics = lyricsify_find_song_lyrics(query)
+    except Exception as e:
+        print("Error getting Lyricsify lyrics for: " + file[0] + file[1])
+        raise e
     if lyrics is None and genius_access_token is not None:
         site_used = "Genius   "
-        lyrics = genius_find_song_lyrics(query, genius_access_token)
+        try:
+            lyrics = genius_find_song_lyrics(query, genius_access_token)
+        except Exception as e:
+            print("Error getting Lyricsify lyrics for: " + file[0] + file[1])
+            raise e
     if lyrics is not None:
         if audio_file.tag is None:
             audio_file.initTag()
