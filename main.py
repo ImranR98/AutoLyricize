@@ -15,6 +15,7 @@ import eyed3
 from dotenv import load_dotenv
 load_dotenv()
 
+
 def lyricsify_find_song_lyrics(query):
     """
     Return song lyrics from Lyricsify.com for the first song found using the provided search string.
@@ -100,14 +101,28 @@ if len(genius_access_token) == 0:
 if genius_access_token is None:
     print("Note: The GENIUS_ACCESS_TOKEN environment variable has not been defined. Only Lyricsify.com will be used as a data source.")
 if (len(sys.argv) < 2):
-    raise NameError("The song directory path has not been provided as a parameter.")
+    raise NameError(
+        "The song directory path has not been provided as a parameter.")
 song_dir = sys.argv[1]
 
 # For each file in the songs directory, grab the artist/title and use them to find Lyricsify.com lyrics (with Genius.com as a fallback) and save them to the file
 files = [os.path.splitext(each) for each in os.listdir(song_dir)]
-eyed3.log.setLevel("ERROR") # To suppress CRC check failed warnings - as a pre-existing CRC issue should not affect lyrics
+# To suppress CRC check failed warnings - as a pre-existing CRC issue should not affect lyrics
+eyed3.log.setLevel("ERROR")
 for i, file in enumerate(files):
     audio_file = eyed3.load(song_dir + "/" + file[0] + file[1])
+    if audio_file.tag is None:
+        audio_file.initTag()
+        temp_ind = file[0].find("-")
+        if len(file[0]) > 0 and temp_ind > 0 and not file[0].endswith("-"):
+            audio_file.tag.artist = file[0][0:temp_ind]
+            audio_file.tag.title = file[0][temp_ind+1:]
+            print(str(i+1) + "\tof " + str(len(files)) +
+                  " : Warning : Artist/Title inferred from file name : " + file[0] + file[1])
+        else:
+            print(str(i+1) + "\tof " + str(len(files)) + " : Failed  : Artist/Title could not be found      : " +
+                  file[0] + file[1])
+            continue
     # re.sub... removes anything in brackets - used for "(feat. ...)"
     query = re.sub(r" ?\([^)]+\)", "",
                    audio_file.tag.artist + " - " + audio_file.tag.title)
@@ -125,12 +140,10 @@ for i, file in enumerate(files):
             print("Error getting Lyricsify lyrics for: " + file[0] + file[1])
             raise e
     if lyrics is not None:
-        if audio_file.tag is None:
-            audio_file.initTag()
         audio_file.tag.lyrics.set(lyrics)
         audio_file.tag.save()
-        print(str(i+1) + "\tof " + str(len(files)) + " : Success : Lyrics from " + site_used + " saved to : " +
+        print(str(i+1) + "\tof " + str(len(files)) + " : Success : Lyrics from " + site_used + " saved to       : " +
               file[0] + file[1])
     else:
-        print(str(i+1) + "\tof " + str(len(files)) + " : Failed  : Lyrics not found for           : " +
+        print(str(i+1) + "\tof " + str(len(files)) + " : Failed  : Lyrics not found for                 : " +
               file[0] + file[1])
