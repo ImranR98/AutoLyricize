@@ -129,7 +129,14 @@ for i, file in enumerate(files):
             print(str(i+1) + "\tof " + str(len(files)) + " : Failed  : Artist/Title could not be found      : " +
                   file[0] + file[1])
             continue
-    # re.sub... removes anything in brackets - used for "(feat. ...)"
+    existing_lyrics = ""
+    for lyric in audio_file.tag.lyrics:
+        existing_lyrics += lyric.text
+    if len(existing_lyrics.strip()) > 0:
+        print(str(i+1) + "\tof " + str(len(files)) + " : Warning : File already has lyrics - skipped    : " +
+              file[0] + file[1])
+        continue
+    # Note: re.sub... removes anything in brackets - used for "(feat. ...) as this improves search results"
     query = re.sub(r" ?\([^)]+\)", "",
                    audio_file.tag.artist + " - " + audio_file.tag.title)
     site_used = "Lyricsify"
