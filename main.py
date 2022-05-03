@@ -73,8 +73,13 @@ def genius_find_song_lyrics(query, access_token):
     # Scrape the song URL for the lyrics text
     page = requests.get(song["url"])
     html = BeautifulSoup(page.text, "html.parser")
-    lyrics = "\n".join(
-        html.find("div", id="lyrics-root").strings).split("\n")[1:-2]
+    target_div = html.find("div", id="lyrics-root")
+    # This ususally means the song is an instrumental (exists on the site and was found, but no lyrics)
+    if target_div is None:
+        lyrics = ["[Instrumental]"]
+    else:
+        lyrics = "\n".join(
+            html.find("div", id="lyrics-root").strings).split("\n")[1:-2]
     # The extracted lyrics text is mangled, needs some processing before it is returned...
     indices = []
     for i, lyric in enumerate(lyrics):
