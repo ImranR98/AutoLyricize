@@ -42,10 +42,11 @@ def lyricsify_find_song_lyrics(query):
         "html.parser")
     # If the artist or song name does not exist in the query, return None
     artist_title = song_html.find("h1").string[:-7]
-    artist = artist_title[0:artist_title.index("-")].strip()
-    title = artist_title[artist_title.index("-") + 1:].strip()
+    sep_ind = artist_title.find("-")
+    artist = None if sep_ind < 0 else artist_title[0:sep_ind].strip()
+    title = artist_title if sep_ind < 0 else artist_title[sep_ind + 1:].strip()
     query_lower = query.lower()
-    if query_lower.find(title.lower()) < 0 or query_lower.find(artist.lower()) < 0:
+    if query_lower.find(title.lower()) < 0 or (sep_ind >= 0 and query_lower.find(artist.lower()) < 0):
         return None
     # Return the lyrics text
     return "".join(song_html.find("div", id="entry").strings)
