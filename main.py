@@ -117,6 +117,10 @@ files = [os.path.splitext(each) for each in os.listdir(song_dir)]
 eyed3.log.setLevel("ERROR")
 for i, file in enumerate(files):
     audio_file = eyed3.load(song_dir + "/" + file[0] + file[1])
+    if audio_file is None:
+        print(str(i+1) + "\tof " + str(len(files)) + " : Failed  : Unsupported file format              : " +
+              file[0] + file[1])
+        continue
     if audio_file.tag is None:
         audio_file.initTag()
         temp_ind = file[0].find("-")
