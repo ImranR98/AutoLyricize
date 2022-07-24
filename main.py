@@ -166,4 +166,4 @@ for i, file in enumerate(files):
               file[0] + file[1])
 
 # To generate lrc files from AutoLyricize-processed audio files if needed (bash script, requires exiftool):
-# for f in *; do lrc="$(exiftool -lyrics "$f" | tail -c +35 | sed 's/\.\.\./\n\n/g' | sed 's/\.\./\n/g')"; if [ -n "$lrc" ]; then echo "$lrc" > "${f%.*}".lrc; fi; done
+# for f in *; do lrc="$(exiftool -lyrics "$f" | tail -c +35 | sed 's/\.\./\n/g' | sed 's/\.\[/\n[/g')"; if [ -n "$lrc" ]; then echo "$lrc" > "${f%.*}".lrc; fi; done
