@@ -58,10 +58,14 @@ def genius_find_song_lyrics(query, access_token):
     If not found, return None.
     Requires a Genius.com access token.
     """
+    headers = {
+        "User-Agent": os.getenv("HEADER"),
+        "Authorization": "Bearer " + access_token,  # Include your Genius API key
+    }
     # Search Genius for the song using their API
     results = json.loads(requests.get(url="https://api.genius.com/search?q=" + urllib.parse.quote(query), headers={
         "Authorization": "Bearer " + access_token,
-        "User-Agent": ""
+        "User-Agent": os.getenv("HEADER")
     }).text)
     # If no hits, return None
     if len(results["response"]["hits"]) <= 0:
@@ -72,15 +76,20 @@ def genius_find_song_lyrics(query, access_token):
     if song["url"] is None or query_lower.find(song["title"].lower()) < 0 or query_lower.find(song["primary_artist"]["name"].lower()) < 0:
         return None
     # Scrape the song URL for the lyrics text
-    page = requests.get(song["url"])
+    page = requests.get(song["url"], headers=headers)
     html = BeautifulSoup(page.text, "html.parser")
-    target_div = html.find("div", id="lyrics-root")
-    # This ususally means the song is an instrumental (exists on the site and was found, but no lyrics)
-    if target_div is None:
-        lyrics = ["[Instrumental]"]
-    else:
-        lyrics = "\n".join(
-            html.find("div", id="lyrics-root").strings).split("\n")[1:-2]
+    #target_div = html.find("div", id="lyrics-root")
+    if (html.find("div", id="cloudflare_content")):
+        raise Exception(
+            "Scraping encountered Cloudflare and cannot continue.")
+    target_divs = html.find_all("div", {'data-lyrics-container': "true"})
+    #print(target_divs)
+    lyrics = []
+    for div in target_divs:    
+        if div is None: # This ususally means the song is an instrumental (exists on the site and was found, but no lyrics)
+            lyrics = ["[Instrumental]"]
+        else:
+            lyrics = "\n".join("\n".join(div.strings) for div in target_divs).split("\n")[1:-2]
     # The extracted lyrics text is mangled, needs some processing before it is returned...
     indices = []
     for i, lyric in enumerate(lyrics):
@@ -93,11 +102,11 @@ def genius_find_song_lyrics(query, access_token):
     final_lyrics = []
     for i, lyric in enumerate(lyrics):
         if (i < (len(lyrics) - 1) and (lyrics[i+1] == ")" or lyrics[i+1] == "]")) or lyric == ")" or lyric == "]" or (i > 0 and lyrics[i-1].endswith(" ") or lyric.startswith(" ")):
-            final_lyrics[len(final_lyrics) -
-                         1] = final_lyrics[len(final_lyrics)-1] + lyric
-        else:
-            final_lyrics.append(lyric)
-    return "[ti:" + song["title_with_featured"] + "]\n[ar:" + song["primary_artist"]["name"] + "]\n" + "\n".join(final_lyrics)
+            if final_lyrics:
+                final_lyrics[len(final_lyrics)-1] = final_lyrics[len(final_lyrics)-1] + lyric
+            else:
+                final_lyrics.append(lyric)
+    return "\n".join(final_lyrics)
 
 
 # First, ensure user input exists
@@ -112,58 +121,83 @@ if (len(sys.argv) < 2):
 song_dir = sys.argv[1]
 
 # For each file in the songs directory, grab the artist/title and use them to find Lyricsify.com lyrics (with Genius.com as a fallback) and save them to the file
-files = [os.path.splitext(each) for each in os.listdir(song_dir)]
+os.remove('current.txt')
+open('current.txt', 'a').close()
+with open('current.txt', 'a') as current:
+    total = 0
+    for folder, subs, files in os.walk(song_dir):
+        for file in files:
+            current.write(folder + '/' + file + '\n')
+            total += 1
+            #current.write(os.path.join(folder, file))
+            #current.write('\n')
+if total == 0:
+    print("Directory is empty or does not exist.")
+#os.execute("bash -c '
 # To suppress CRC check failed warnings - as a pre-existing CRC issue should not affect lyrics
 eyed3.log.setLevel("ERROR")
-for i, file in enumerate(files):
-    audio_file = eyed3.load(song_dir + "/" + file[0] + file[1])
-    if audio_file is None:
-        print(str(i+1) + "\tof " + str(len(files)) + " : Failed  : Unsupported file format              : " +
-              file[0] + file[1])
-        continue
-    if audio_file.tag is None:
-        audio_file.initTag()
-        temp_ind = file[0].find("-")
-        if len(file[0]) > 0 and temp_ind > 0 and not file[0].endswith("-"):
+with open('current.txt') as current:
+    i = 0
+    for file in current:
+        #print(repr(file))
+        audio_file = eyed3.load(file.strip())
+        #print(file[0])
+        #print(file[1])
+        if audio_file is None:
+            print(str(i+1) + "\tof " + str(total) + " : Failed  : Unsupported file format              : " +
+                  file)
+            continue
+        if audio_file.tag is None:
+            audio_file.initTag()
+            temp_ind = file.find("-")
+            continue
+        """
+        if len(file) > 0 and temp_ind > 0 and not file.endswith("-"):
             audio_file.tag.artist = file[0][0:temp_ind]
             audio_file.tag.title = file[0][temp_ind+1:]
             print(str(i+1) + "\tof " + str(len(files)) +
-                  " : Warning : Artist/Title inferred from file name : " + file[0] + file[1])
+              " : Warning : Artist/Title inferred from file name : " + file[0] + file[1])
         else:
             print(str(i+1) + "\tof " + str(len(files)) + " : Failed  : Artist/Title could not be found      : " +
-                  file[0] + file[1])
+              file[0] + file[1])
             continue
-    existing_lyrics = ""
-    for lyric in audio_file.tag.lyrics:
-        existing_lyrics += lyric.text
-    if len(existing_lyrics.strip()) > 0:
-        print(str(i+1) + "\tof " + str(len(files)) + " : Warning : File already has lyrics - skipped    : " +
-              file[0] + file[1])
-        continue
-    # Note: re.sub... removes anything in brackets - used for "(feat. ...) as this improves search results"
-    query = re.sub(r" ?\([^)]+\)", "",
-                   audio_file.tag.artist + " - " + audio_file.tag.title)
-    site_used = "Lyricsify"
-    try:
-        lyrics = lyricsify_find_song_lyrics(query)
-    except Exception as e:
-        print("Error getting Lyricsify lyrics for: " + file[0] + file[1])
-        raise e
-    if lyrics is None and genius_access_token is not None:
-        site_used = "Genius   "
+        # didn't adapt this section since this situation doesn't happen to me. also i don't understand the code.
+        """
+        existing_lyrics = ""
+        i += 1
+        #print(files)
+        for lyric in audio_file.tag.lyrics:
+            existing_lyrics += lyric.text
+        if len(existing_lyrics.strip()) > 0: #change this to "if 2<1:" to force. can't be bothered to figure out arguments rn
+            print(str(i) + "\tof " + str(total) + " : Warning : File already has lyrics - skipped    : " +
+                  file.strip())
+            continue
+        # Note: re.sub... removes anything in brackets - used for "(feat. ...) as this improves search results"
+        query = re.sub(r" \[^]+\)", "",
+               audio_file.tag.artist + " - " + audio_file.tag.title)
+        site_used = "Lyricsify"
         try:
-            lyrics = genius_find_song_lyrics(query, genius_access_token)
+            lyrics = lyricsify_find_song_lyrics(query)
         except Exception as e:
-            print("Error getting Lyricsify lyrics for: " + file[0] + file[1])
+            print("Error getting Lyricsify lyrics for: " + file.strip())
             raise e
-    if lyrics is not None:
-        audio_file.tag.lyrics.set(lyrics)
-        audio_file.tag.save()
-        print(str(i+1) + "\tof " + str(len(files)) + " : Success : Lyrics from " + site_used + " saved to       : " +
-              file[0] + file[1])
-    else:
-        print(str(i+1) + "\tof " + str(len(files)) + " : Failed  : Lyrics not found for                 : " +
-              file[0] + file[1])
+        if lyrics is None and genius_access_token is not None:
+            site_used = "Genius   "
+            try:
+                #print(query)
+                lyrics = genius_find_song_lyrics(query, genius_access_token)
+            except Exception as e:
+                print("Error getting Genius lyrics for: " + file.strip())
+                raise e
+        if lyrics is not None:
+            audio_file.tag.lyrics.set(lyrics)
+            audio_file.tag.save()
+            print(str(i) + "\tof " + str(total) + " : Success : Lyrics from " + site_used + " saved to       : " +
+                  file.strip())
+            #print(lyrics)
+        else:
+            print(str(i) + "\tof " + str(total) + " : Failed  : Lyrics not found for                 : " +
+                  file.strip())
 
 # To generate lrc files from AutoLyricize-processed audio files if needed (bash script, requires exiftool):
 # for f in *; do lrc="$(exiftool -lyrics "$f" | tail -c +35 | sed 's/\.\./\n/g' | sed 's/\.\[/\n[/g')"; if [ -n "$lrc" ]; then echo "$lrc" > "${f%.*}".lrc; fi; done
