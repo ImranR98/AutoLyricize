@@ -126,7 +126,12 @@ with open('current.txt') as current:
     shlong = open("short.txt", 'r')
     short = shlong.readlines()
     for file in current:
-        audio_file = eyed3.load(file.strip())
+        try: audio_file = eyed3.load(file.strip())
+        except:
+            print(str(i+1) + "\tof " + str(total) + f" : {Color.RED}Failed{Color.OFF}  : File does not appear to exist        : " +
+                  short[i].strip())
+            i += 1
+            continue
         if audio_file is None:
             print(str(i+1) + "\tof " + str(total) + f" : {Color.RED}Failed{Color.OFF}  : Unsupported file format              : " +
                   short[i].strip())
