@@ -78,36 +78,19 @@ def genius_find_song_lyrics(query, access_token):
     # Scrape the song URL for the lyrics text
     page = requests.get(song["url"], headers=headers)
     html = BeautifulSoup(page.text, "html.parser")
-    #target_div = html.find("div", id="lyrics-root")
     if (html.find("div", id="cloudflare_content")):
         raise Exception(
             "Scraping encountered Cloudflare and cannot continue.")
     target_divs = html.find_all("div", {'data-lyrics-container': "true"})
-    #print(target_divs)
     lyrics = []
     for div in target_divs:    
         if div is None: # This ususally means the song is an instrumental (exists on the site and was found, but no lyrics)
-            lyrics = ["[Instrumental]"]
+            return ""
         else:
-            lyrics = "\n".join("\n".join(div.strings) for div in target_divs).split("\n")[1:-2]
-    # The extracted lyrics text is mangled, needs some processing before it is returned...
-    indices = []
-    for i, lyric in enumerate(lyrics):
-        if lyric[0] == "[":
-            indices.append(i)
-    inserted = 0
-    for i in indices:
-        lyrics.insert(i+inserted, "")
-        inserted += 1
-    final_lyrics = []
-    for i, lyric in enumerate(lyrics):
-        if (i < (len(lyrics) - 1) and (lyrics[i+1] == ")" or lyrics[i+1] == "]")) or lyric == ")" or lyric == "]" or (i > 0 and lyrics[i-1].endswith(" ") or lyric.startswith(" ")):
-            if final_lyrics:
-                final_lyrics[len(final_lyrics)-1] = final_lyrics[len(final_lyrics)-1] + lyric
-            else:
-                final_lyrics.append(lyric)
-    return "\n".join(final_lyrics)
-
+            lyrics = "\n".join("\n".join(div.strings) for div in target_divs).split("\n")
+    final_lyrics = "\n".join(lyrics)
+    final_lyrics = final_lyrics.replace("(\n","(").replace("\n)",")").replace(" \n"," ").replace("\n]","]").replace("\n,",",").replace("\n'\n","\n'").replace("\n[","\n\n[") # Removing unwanted line breaks. This mostly works
+    return final_lyrics
 
 # First, ensure user input exists
 genius_access_token = os.getenv("GENIUS_ACCESS_TOKEN")
@@ -120,32 +103,42 @@ if (len(sys.argv) < 2):
         "The song directory path has not been provided as a parameter.")
 song_dir = sys.argv[1]
 
+
+
 # For each file in the songs directory, grab the artist/title and use them to find Lyricsify.com lyrics (with Genius.com as a fallback) and save them to the file
-os.remove('current.txt')
+
+# Record all files in the current directory by both full path and short name
+try: os.remove('current.txt')
+except OSError: pass
 open('current.txt', 'a').close()
+try: os.remove('short.txt')
+except OSError: pass
+open('short.txt', 'a').close()
+
 with open('current.txt', 'a') as current:
     total = 0
-    for folder, subs, files in os.walk(song_dir):
-        for file in files:
-            current.write(folder + '/' + file + '\n')
-            total += 1
-            #current.write(os.path.join(folder, file))
-            #current.write('\n')
+    with open('short.txt', 'a') as short:
+        for folder, subs, files in os.walk(song_dir):
+            for file in files:
+                current.write(folder + '/' + file + '\n')
+                short.write(file + '\n')
+                total += 1
 if total == 0:
     print("Directory is empty or does not exist.")
-#os.execute("bash -c '
+else:
+    overwrite = input("Reply Y to overwrite current lyrics: ").lower()
+
 # To suppress CRC check failed warnings - as a pre-existing CRC issue should not affect lyrics
 eyed3.log.setLevel("ERROR")
 with open('current.txt') as current:
     i = 0
+    shlong = open("short.txt", 'r')
+    short = shlong.readlines()
     for file in current:
-        #print(repr(file))
         audio_file = eyed3.load(file.strip())
-        #print(file[0])
-        #print(file[1])
         if audio_file is None:
             print(str(i+1) + "\tof " + str(total) + " : Failed  : Unsupported file format              : " +
-                  file)
+                  short[i].strip())
             continue
         if audio_file.tag is None:
             audio_file.initTag()
@@ -164,13 +157,11 @@ with open('current.txt') as current:
         # didn't adapt this section since this situation doesn't happen to me. also i don't understand the code.
         """
         existing_lyrics = ""
-        i += 1
-        #print(files)
         for lyric in audio_file.tag.lyrics:
             existing_lyrics += lyric.text
-        if len(existing_lyrics.strip()) > 0: #change this to "if 2<1:" to force. can't be bothered to figure out arguments rn
-            print(str(i) + "\tof " + str(total) + " : Warning : File already has lyrics - skipped    : " +
-                  file.strip())
+        if len(existing_lyrics) > 0 and overwrite != 'y':
+            print(str(i+1) + "\tof " + str(total) + " : Warning : File already has lyrics - skipped    : " +
+                  short[i].strip())
             continue
         # Note: re.sub... removes anything in brackets - used for "(feat. ...) as this improves search results"
         query = re.sub(r" \[^]+\)", "",
@@ -179,7 +170,7 @@ with open('current.txt') as current:
         try:
             lyrics = lyricsify_find_song_lyrics(query)
         except Exception as e:
-            print("Error getting Lyricsify lyrics for: " + file.strip())
+            print("Error getting Lyricsify lyrics for: " + short[i].strip())
             raise e
         if lyrics is None and genius_access_token is not None:
             site_used = "Genius   "
@@ -187,17 +178,18 @@ with open('current.txt') as current:
                 #print(query)
                 lyrics = genius_find_song_lyrics(query, genius_access_token)
             except Exception as e:
-                print("Error getting Genius lyrics for: " + file.strip())
+                print("Error getting Genius lyrics for: " + short[i].strip())
                 raise e
         if lyrics is not None:
             audio_file.tag.lyrics.set(lyrics)
             audio_file.tag.save()
-            print(str(i) + "\tof " + str(total) + " : Success : Lyrics from " + site_used + " saved to       : " +
-                  file.strip())
-            #print(lyrics)
+            print(str(i+1) + "\tof " + str(total) + " : Success : Lyrics from " + site_used + " saved to       : " +
+                  short[i].strip())
         else:
-            print(str(i) + "\tof " + str(total) + " : Failed  : Lyrics not found for                 : " +
-                  file.strip())
-
+            print(str(i+1) + "\tof " + str(total) + " : Failed  : Lyrics not found for                 : " +
+                  short[i].strip())
+        i += 1
+os.remove('current.txt')
+os.remove('short.txt')
 # To generate lrc files from AutoLyricize-processed audio files if needed (bash script, requires exiftool):
 # for f in *; do lrc="$(exiftool -lyrics "$f" | tail -c +35 | sed 's/\.\./\n/g' | sed 's/\.\[/\n[/g')"; if [ -n "$lrc" ]; then echo "$lrc" > "${f%.*}".lrc; fi; done
