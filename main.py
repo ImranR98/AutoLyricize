@@ -106,14 +106,13 @@ try: os.remove('short.txt')
 except OSError: pass
 open('short.txt', 'a').close()
 
-with open('current.txt', 'a') as current:
+with open('current.txt', 'a') as current, open('short.txt', 'a') as short:
     total = 0
-    with open('short.txt', 'a') as short:
-        for folder, subs, files in os.walk(song_dir):
-            for file in files:
-                current.write(folder + '/' + file + '\n')
-                short.write(file + '\n')
-                total += 1
+    for folder, subs, files in os.walk(song_dir):
+        for file in files:
+            current.write(folder + '/' + file + '\n')
+            short.write(file + '\n')
+            total += 1
 if total == 0:
     print("Directory is empty or does not exist.")
 else:
@@ -122,20 +121,17 @@ else:
 # To suppress CRC check failed warnings - as a pre-existing CRC issue should not affect lyrics
 eyed3.log.setLevel("ERROR")
 with open('current.txt') as current:
-    i = 0
     shlong = open("short.txt", 'r')
     short = shlong.readlines()
-    for file in current:
+    for i, file in enumerate(current):
         try: audio_file = eyed3.load(file.strip())
         except:
             print(str(i+1) + "\tof " + str(total) + f" : {Color.RED}Failed{Color.OFF}  : File does not appear to exist        : " +
                   short[i].strip())
-            i += 1
             continue
         if audio_file is None:
             print(str(i+1) + "\tof " + str(total) + f" : {Color.RED}Failed{Color.OFF}  : Unsupported file format              : " +
                   short[i].strip())
-            i += 1
             continue
         if audio_file.tag is None:
             audio_file.initTag()
@@ -159,7 +155,6 @@ with open('current.txt') as current:
         if len(existing_lyrics) > 0 and overwrite != 'y':
             print(str(i+1) + "\tof " + str(total) + f" : {Color.YELLOW}Warning{Color.OFF} : File already has lyrics - skipped    : " +
                   short[i].strip())
-            i += 1
             continue
         # Note: re.sub... removes anything in brackets - used for "(feat. ...) as this improves search results"
         query = re.sub(r" \[^]+\)", "",
@@ -189,7 +184,6 @@ with open('current.txt') as current:
         else:
             print(str(i+1) + "\tof " + str(total) + f" : {Color.RED}Failed{Color.OFF}  : Lyrics not found for                 : " +
                   short[i].strip())
-        i += 1
 os.remove('current.txt')
 os.remove('short.txt')
 # To generate lrc files from AutoLyricize-processed audio files if needed (bash script, requires exiftool):
