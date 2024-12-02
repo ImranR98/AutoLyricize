@@ -12,6 +12,7 @@ import requests
 import os
 import re
 import eyed3
+from colorist import Color
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -23,33 +24,21 @@ def lyricsify_find_song_lyrics(query):
     """
     # Search Lyricsify for the song using web scraping
     link = BeautifulSoup(
-        requests.get(url="https://www.lyricsify.com/search?q=" +
-                     query.replace(
-                         " - ", "+").replace(" ", "+"),
+        requests.get(url="https://www.lyricsify.com/lyrics/" +
+                     query.lower().replace(
+                         " - ", "/").replace(" ", "-"),
                      headers={
-                         "User-Agent": ""
+                         "User-Agent": os.getenv("HEADER")
                      }).text,
-        "html.parser").find("a", class_="title")
-    # If not found, return None
-    if link is None:
-        return None
-    # Scrape the song URL for the lyrics text
-    song_html = BeautifulSoup(
-        requests.get(url="https://www.lyricsify.com" + link.attrs['href'],
-                     headers={
-            "User-Agent": ""
-        }).text,
         "html.parser")
-    # If the artist or song name does not exist in the query, return None
-    artist_title = song_html.find("h1").string[:-7]
-    sep_ind = artist_title.find("-")
-    artist = None if sep_ind < 0 else artist_title[0:sep_ind].strip()
-    title = artist_title if sep_ind < 0 else artist_title[sep_ind + 1:].strip()
-    query_lower = query.lower()
-    if query_lower.find(title.lower()) < 0 or (sep_ind >= 0 and query_lower.find(artist.lower()) < 0):
+    divs = link.find_all("div", id=re.compile(r"lyrics_.*_details"))# The site obfuscates(?) the div name but we can bypass this with the power of regex
+    
+    # If not found, return None
+    if divs is None:
         return None
-    # Return the lyrics text
-    return "".join(song_html.find("div", id="entry").strings)
+    # Scrape the song html for the lyrics text
+    song_html='\n'.join(str(divs[0]).split('\n')[1:-1]).replace("<br/>","")
+    return(song_html)
 
 
 def genius_find_song_lyrics(query, access_token):
@@ -85,11 +74,13 @@ def genius_find_song_lyrics(query, access_token):
     lyrics = []
     for div in target_divs:    
         if div is None: # This ususally means the song is an instrumental (exists on the site and was found, but no lyrics)
-            return ""
+            return None
         else:
             lyrics = "\n".join("\n".join(div.strings) for div in target_divs).split("\n")
     final_lyrics = "\n".join(lyrics)
     final_lyrics = final_lyrics.replace("(\n","(").replace("\n)",")").replace(" \n"," ").replace("\n]","]").replace("\n,",",").replace("\n'\n","\n'").replace("\n[","\n\n[") # Removing unwanted line breaks. This mostly works
+    if final_lyrics == "":
+        return None
     return final_lyrics
 
 # First, ensure user input exists
@@ -137,8 +128,9 @@ with open('current.txt') as current:
     for file in current:
         audio_file = eyed3.load(file.strip())
         if audio_file is None:
-            print(str(i+1) + "\tof " + str(total) + " : Failed  : Unsupported file format              : " +
+            print(str(i+1) + "\tof " + str(total) + f" : {Color.RED}Failed{Color.OFF}  : Unsupported file format              : " +
                   short[i].strip())
+            i += 1
             continue
         if audio_file.tag is None:
             audio_file.initTag()
@@ -160,18 +152,22 @@ with open('current.txt') as current:
         for lyric in audio_file.tag.lyrics:
             existing_lyrics += lyric.text
         if len(existing_lyrics) > 0 and overwrite != 'y':
-            print(str(i+1) + "\tof " + str(total) + " : Warning : File already has lyrics - skipped    : " +
+            print(str(i+1) + "\tof " + str(total) + f" : {Color.YELLOW}Warning{Color.OFF} : File already has lyrics - skipped    : " +
                   short[i].strip())
+            i += 1
             continue
         # Note: re.sub... removes anything in brackets - used for "(feat. ...) as this improves search results"
         query = re.sub(r" \[^]+\)", "",
                audio_file.tag.artist + " - " + audio_file.tag.title)
         site_used = "Lyricsify"
+        ''' i don't actually want to use lyricsify. uncomment if you do.
         try:
             lyrics = lyricsify_find_song_lyrics(query)
         except Exception as e:
             print("Error getting Lyricsify lyrics for: " + short[i].strip())
             raise e
+        '''
+        lyrics = None
         if lyrics is None and genius_access_token is not None:
             site_used = "Genius   "
             try:
@@ -183,10 +179,10 @@ with open('current.txt') as current:
         if lyrics is not None:
             audio_file.tag.lyrics.set(lyrics)
             audio_file.tag.save()
-            print(str(i+1) + "\tof " + str(total) + " : Success : Lyrics from " + site_used + " saved to       : " +
+            print(str(i+1) + "\tof " + str(total) + f" : {Color.GREEN}Success{Color.OFF} : Lyrics from " + site_used + " saved to       : " +
                   short[i].strip())
         else:
-            print(str(i+1) + "\tof " + str(total) + " : Failed  : Lyrics not found for                 : " +
+            print(str(i+1) + "\tof " + str(total) + f" : {Color.RED}Failed{Color.OFF}  : Lyrics not found for                 : " +
                   short[i].strip())
         i += 1
 os.remove('current.txt')
