@@ -149,18 +149,19 @@ else:
     overwrite = input("Overwrite current lyrics? y/N ").lower()
     if overwrite not in yesno:
         print(f"{Color.YELLOW}Interpreting unknown response as no{Color.OFF}")
+        evenifunsynced = "n"
     elif overwrite == "y" and os.getenv("I_WANT_SYNCED_LYRICS") == "True":
         evenifunsynced = input("Even if the new ones are unsynced? y/N ").lower()
-        if evenifunsynced not in yesno:
+        if evenifunsynced != "y":
             print(f"{Color.YELLOW}Intepreting unknown response as no{Color.OFF}")
             evenifunsynced = "n"
     requireexact = input("Require exact artist and title? (Recommended with large folders!!!) Y/n ").lower()
     if requireexact not in yesno:
         print(f"{Color.YELLOW}Interpreting unknown response as yes{Color.OFF}")
         requireexact = "y"
-    
-        
-print("\n")
+    else:
+        requireexact = "n"
+    print("\n")
 # To suppress CRC check failed warnings - as a pre-existing CRC issue should not affect lyrics
 eyed3.log.setLevel("ERROR")
 with open('current.txt') as current:
