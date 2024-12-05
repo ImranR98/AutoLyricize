@@ -159,8 +159,6 @@ else:
     if requireexact not in yesno:
         print(f"{Color.YELLOW}Interpreting unknown response as yes{Color.OFF}")
         requireexact = "y"
-    else:
-        requireexact = "n"
     print("\n")
 # To suppress CRC check failed warnings - as a pre-existing CRC issue should not affect lyrics
 eyed3.log.setLevel("ERROR")
