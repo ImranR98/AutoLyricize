@@ -23,3 +23,5 @@ Run `python main.py "path/to/folder"`.
 
 - Inexact search uses Genius's search system, which loves to give you results that have absolutely nothing to do with the original track. If you use inexact search with instrumental tracks or albums, you are going to get garbage data.
 - Only works with mp3 files due to a limitation in the eyed3 library.
+
+This script took a little under 3 hours to run for my 5000-song library.
