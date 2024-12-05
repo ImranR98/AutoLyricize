@@ -18,3 +18,8 @@ Perfect for use with [Spotiflyer](https://github.com/Shabinder/SpotiFlyer/), [Re
 
 Run `python main.py "path/to/folder"`.
 *useful tip for noobs: you can drag a folder into the terminal window to paste its full path* 👍
+
+## Limitations
+
+- Inexact search uses Genius's search system, which loves to give you results that have absolutely nothing to do with the original track. If you use inexact search with instrumental tracks or albums, you are going to get garbage data.
+- Only works with mp3 files due to a limitation in the eyed3 library.
