@@ -52,7 +52,7 @@ def lyricsify_find_song_lyrics(query):
 
 
 
-
+inexact_url=""
 def genius_find_song_lyrics(query, access_token):
     """
     Return song lyrics from Genius.com for the first song found using the provided search string.
@@ -73,12 +73,15 @@ def genius_find_song_lyrics(query, access_token):
     query_lower = query.lower()
     
     # Use Genius sucky search if you can and there's no exact match
+    # Also sets variables to make this more transparent
     global inexact
+    global inexact_url
     inexact = 0
-    if song["url"] is None or query_lower.find(song["title"].lower()) < 0 or query_lower.find(song["primary_artist"]["name"].lower()) < 0:
+    if query_lower.find(song["title"].lower()) <= 0 or query_lower.find(song["primary_artist"]["name"].lower()) <= 0:
         if requireexact == "y":
             return None
         inexact = 1
+        inexact_url = song["url"]
  
     # Scrape the song URL for the lyrics text
     page = requests.get(song["url"], headers=headers)
@@ -98,7 +101,7 @@ def genius_find_song_lyrics(query, access_token):
     final_lyrics = "\n".join(lyrics)
     if final_lyrics == "":
         inexact = 0
-        return None
+        return "inst"
     final_lyrics = final_lyrics.replace("(\n","(").replace("\n)",")").replace(" \n"," ").replace("\n "," ").replace("\n]","]").replace("\n,",",").replace("\n'\n","\n'").replace("\n\n[","\n[").replace("\n[","\n\n[") 
     # Removing unwanted line breaks lol
     return final_lyrics
@@ -245,20 +248,29 @@ with open('current.txt') as current:
              
         # Saving tags and logging success
         if lyrics is not None:
+            # Instrumental
+            if lyrics == "inst":
+                print(str(i+1) + "\tof " + str(total) + f" : {Color.YELLOW}Success{Color.OFF} : Genius says song is an instrumental  : " +
+                      short[i].strip())
+                continue
             audio_file.tag.lyrics.set(lyrics)
             audio_file.tag.save()
             if inexact == 1:
-                print(str(i+1) + "\tof " + str(total) + f" : {Color.GREEN}Success{Color.OFF} : Lyrics from " + site_used + f" saved to  {Color.YELLOW}(i){Color.OFF}  : " +
+                # Success with inexact search
+                print(str(i+1) + "\tof " + str(total) + f" : {Color.GREEN}Success{Color.OFF} : Lyrics from " + site_used + f" saved to  {Color.YELLOW}" + link(inexact_url, "(i)") + f"{Color.OFF}  : " +
                       short[i].strip())
             else:
+                # Success with perfect match
                 print(str(i+1) + "\tof " + str(total) + f" : {Color.GREEN}Success{Color.OFF} : Lyrics from " + site_used + " saved to       : " +
                       short[i].strip())
                       
         # Logging failures              
         elif evenifunsynced != "y" and len(existing_lyrics) > 0:
+            # No synced results when only synced results are allowed
             print(str(i+1) + "\tof " + str(total) + f" : {Color.YELLOW}Failed{Color.OFF}  : No synced lyrics found, preserving   : " +
               short[i].strip())
         else:
+            # No lyrics found at all
             print(str(i+1) + "\tof " + str(total) + f" : {Color.RED}Failed{Color.OFF}  : Lyrics not found for                 : " +
               short[i].strip())
               
