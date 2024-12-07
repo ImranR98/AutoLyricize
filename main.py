@@ -112,10 +112,13 @@ def genius_find_song_lyrics(query, access_token):
 
 
 # Start of the main script
-if (len(sys.argv) < 2):
+if (len(sys.argv) < 2) and not os.getenv("STATIC_WORKING_DIR"):
     raise NameError(
         "The song directory path has not been provided as a parameter.")
-song_dir = sys.argv[1]
+if len(sys.argv) >= 2:
+	song_dir = sys.argv[1]
+else:
+	song_dir = os.getenv("STATIC_WORKING_DIR")
 
 
 # Resetting files
