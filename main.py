@@ -190,24 +190,6 @@ with open('current.txt') as current:
             print(str(i+1) + "\tof " + str(total) + f" : {Color.RED}Failed{Color.OFF}  : Unsupported file format              : " +
                   short[i].strip())
             continue
-            
-        '''
-        # Automatically detecting metadata of untagged files. This does not work
-        if audio_file.tag is None:
-            audio_file.initTag()
-            audio_file.tag.artist = u'TPE1'
-            audio_file.tag.title = u'TIT2'
-            temp_ind = file.find("-")
-            if len(file) > 0 and temp_ind > 0 and not file.endswith("-"):
-                audio_file.tag.artist.set(file[0][0:temp_ind])
-                audio_file.tag.title.set(file[0][temp_ind+1:])                
-                print(str(i+1) + "\tof " + str(len(files)) +
-                  f" : {Color.YELLOW}Warning{Color.OFF} : Artist/Title inferred from file name : " + short[i].strip())
-            else:
-                print(str(i+1) + "\tof " + str(len(files)) + f" : {Color.RED}Failed{Color.OFF}  : Artist/Title could not be found      : " +
-                  short[i].strip())
-                continue
-        '''
         
         existing_lyrics = ""
         try:
@@ -224,9 +206,9 @@ with open('current.txt') as current:
             query = re.sub(r" \[^]+\)", "",
                    audio_file.tag.artist + " - " + audio_file.tag.title)
         except:
-            print(str(i+1) + "\tof " + str(total) + f" : {Color.RED}Failed{Color.OFF}  : Artist/Title could not be found      : " +
+            query = re.sub(r" \[^]+\)", "", short[i].strip()[:-4])
+            print(str(i+1) + "\tof " + str(total) + f" : {Color.YELLOW}Warning{Color.OFF} : No info, setting query to filename   : " +
               short[i].strip())
-            continue
         
         # Calling Lyricsify script
         if os.getenv("I_WANT_SYNCED_LYRICS") == "True":
